@@ -582,9 +582,24 @@ def annotate_solution(warped: np.ndarray, placements: list[tuple[int, int]], n: 
     return out
 
 
-def queen_centers_warped(placements: list[tuple[int, int]], n: int, size: int) -> list[tuple[float, float]]:
+def queen_click_points_warped(placements: list[tuple[int, int]], n: int, size: int) -> list[tuple[float, float]]:
     step = size / float(n)
-    return [((c + 0.5) * step, (r + 0.5) * step) for r, c in placements]
+    points: list[tuple[float, float]] = []
+    for r, c in placements:
+        # Click slightly below center to avoid borderline misses on top-row cells.
+        x_frac = 0.52
+        y_frac = 0.58
+        # Add a bit more inset on outer borders where perspective and line thickness are strongest.
+        if c == 0:
+            x_frac = max(x_frac, 0.60)
+        elif c == n - 1:
+            x_frac = min(x_frac, 0.40)
+        if r == 0:
+            y_frac = max(y_frac, 0.65)
+        elif r == n - 1:
+            y_frac = min(y_frac, 0.45)
+        points.append(((c + x_frac) * step, (r + y_frac) * step))
+    return points
 
 
 def map_points_to_screen(points: list[tuple[float, float]], minv: np.ndarray, left: int = 0, top: int = 0) -> list[tuple[float, float]]:
@@ -612,7 +627,7 @@ def run_pipeline(screen_bgr: np.ndarray, args: argparse.Namespace, monitor_left:
 
     screen_points = None
     if placements:
-        warped_pts = queen_centers_warped(placements, n=n, size=args.warp_size)
+        warped_pts = queen_click_points_warped(placements, n=n, size=args.warp_size)
         screen_points = map_points_to_screen(warped_pts, minv, left=monitor_left, top=monitor_top)
 
     dbg: dict[str, np.ndarray] = {}
@@ -753,7 +768,7 @@ def main() -> None:
                         annotated = annotate_solution(result.warped, result.placements, result.n)
                         cv2.imshow("Warped Board (Solution)", annotated)
 
-                        warped_pts = queen_centers_warped(result.placements, result.n, args.warp_size)
+                        warped_pts = queen_click_points_warped(result.placements, result.n, args.warp_size)
                         print("[INFO] Queen centers in warped space:")
                         for i, (x, y) in enumerate(warped_pts, start=1):
                             print(f"  Q{i}: ({x:.1f}, {y:.1f})")
